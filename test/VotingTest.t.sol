@@ -91,4 +91,105 @@ contract VotingTest is Test {
         assertEq(id1, 0);
         assertEq(id2, 1);
     }
+
+    function testAddToWhitelistSuccess() public {
+        // Arrange 
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll 1"), block.timestamp + 1 days, 3);
+
+        address[] memory voters = new address[](3);
+        voters[0] = makeAddr("Voter1");
+        voters[1] = makeAddr("Voter2");
+        voters[2] = makeAddr("Voter3");
+
+        // Act
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        // Assert
+        for (uint256 i = 0; i < voters.length; i++) {
+            assertTrue(voting.whitelist(0, voters[i]));
+        }
+    }
+
+    function testAddToWhitelistRevertIfNotOwner() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.expectRevert();
+        vm.prank(USER);
+        voting.addToWhitelist(0, new address[](0));
+    }
+
+    function testAddToWhitelistRevertIfPollDoesNotExist() public {
+        vm.expectRevert("Poll does not exist");
+        vm.prank(OWNER);
+        voting.addToWhitelist(999, new address[](0));
+    }
+
+    function testAddToWhitelistEmptyVoterList() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        // Act
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, new address[](0));
+
+        // Assert - No reverts and whitelist remains unchanged
+        assertFalse(voting.whitelist(0, makeAddr("Voter1")));
+    }
+
+    function testAddToWhitelistDuplicateVoters() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address[] memory voters = new address[](3);
+        voters[0] = makeAddr("Voter1");
+        voters[1] = makeAddr("Voter1"); // Duplicate
+        voters[2] = makeAddr("Voter2");
+
+        // Act
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        // Assert - Both unique addresses should be whitelisted
+        assertTrue(voting.whitelist(0, makeAddr("Voter1")));
+        assertTrue(voting.whitelist(0, makeAddr("Voter2")));
+    }
+
+    function testAddToWhitelistOverwrite() public {
+    vm.prank(OWNER);
+    voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+    address voter = makeAddr("Voter");
+
+    address[] memory voters = new address[](1);
+    voters[0] = voter;
+
+    vm.prank(OWNER);
+    voting.addToWhitelist(0, voters);
+
+    // add again
+    vm.prank(OWNER);
+    voting.addToWhitelist(0, voters);
+
+    assertTrue(voting.whitelist(0, voter)); 
+    }
+
+    function testWhitelistIsolationBetweenPolls() public {
+        vm.startPrank(OWNER);
+        voting.createPoll(keccak256("Poll 1"), block.timestamp + 1 days, 2);
+        voting.createPoll(keccak256("Poll 2"), block.timestamp + 1 days, 2);
+        vm.stopPrank();
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        assertTrue(voting.whitelist(0, voter));
+        assertFalse(voting.whitelist(1, voter));
+    }
 }
