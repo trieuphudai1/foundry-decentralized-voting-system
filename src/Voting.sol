@@ -10,7 +10,7 @@ contract Voting is Ownable, ReentrancyGuard {
 
     // Constructor
     constructor(address initialOwner) Ownable(initialOwner) {}
-    
+
     struct Poll {
         uint256 id;
         bytes32 contentHash;
@@ -51,12 +51,7 @@ contract Voting is Ownable, ReentrancyGuard {
         require(_optionCount > 1, "At least two options required");
 
         uint256 pollId = s_pollCounter;
-        polls[pollId] = Poll({
-            id: pollId,
-            contentHash: _contentHash,
-            deadline: _deadline,
-            isActive: true
-        });
+        polls[pollId] = Poll({id: pollId, contentHash: _contentHash, deadline: _deadline, isActive: true});
 
         optionCount[pollId] = _optionCount;
 
@@ -68,5 +63,4 @@ contract Voting is Ownable, ReentrancyGuard {
             whitelist[_pollId][_voters[i]] = true;
         }
     }
-
 }

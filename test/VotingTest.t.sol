@@ -25,12 +25,7 @@ contract VotingTest is Test {
 
         // Assert
         assertEq(voting.s_pollCounter(), 1);
-        (
-            uint256 id,
-            bytes32 storedContentHash,
-            uint256 storedDeadline,
-            bool isActive
-        ) = voting.polls(0);
+        (uint256 id, bytes32 storedContentHash, uint256 storedDeadline, bool isActive) = voting.polls(0);
 
         assertEq(id, 0);
         assertEq(storedContentHash, contentHash);
@@ -85,15 +80,15 @@ contract VotingTest is Test {
 
         assertEq(voting.s_pollCounter(), 2);
 
-        (uint256 id1, , , ) = voting.polls(0);
-        (uint256 id2, , , ) = voting.polls(1);
+        (uint256 id1,,,) = voting.polls(0);
+        (uint256 id2,,,) = voting.polls(1);
 
         assertEq(id1, 0);
         assertEq(id2, 1);
     }
 
     function testAddToWhitelistSuccess() public {
-        // Arrange 
+        // Arrange
         vm.prank(OWNER);
         voting.createPoll(keccak256("Poll 1"), block.timestamp + 1 days, 3);
 
@@ -158,22 +153,22 @@ contract VotingTest is Test {
     }
 
     function testAddToWhitelistOverwrite() public {
-    vm.prank(OWNER);
-    voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
 
-    address voter = makeAddr("Voter");
+        address voter = makeAddr("Voter");
 
-    address[] memory voters = new address[](1);
-    voters[0] = voter;
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
 
-    vm.prank(OWNER);
-    voting.addToWhitelist(0, voters);
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
 
-    // add again
-    vm.prank(OWNER);
-    voting.addToWhitelist(0, voters);
+        // add again
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
 
-    assertTrue(voting.whitelist(0, voter)); 
+        assertTrue(voting.whitelist(0, voter));
     }
 
     function testWhitelistIsolationBetweenPolls() public {
