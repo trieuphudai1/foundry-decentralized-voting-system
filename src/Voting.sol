@@ -129,4 +129,8 @@ contract Voting is Ownable, ReentrancyGuard {
         Poll memory poll = polls[_pollId];
         return (poll.id, poll.contentHash, poll.deadline, poll.isActive);
     }
+
+    function getPollCount() external view returns (uint256) {
+        return s_pollCounter;
+    }
 }

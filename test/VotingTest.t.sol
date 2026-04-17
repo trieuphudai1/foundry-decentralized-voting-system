@@ -507,4 +507,17 @@ contract VotingTest is Test {
         vm.expectRevert("Poll does not exist");
         voting.getPoll(999);
     }
+
+    function testGetPollCount() public {
+        vm.startPrank(OWNER);
+        voting.createPoll(keccak256("Poll 1"), block.timestamp + 1 days, 2);
+        voting.createPoll(keccak256("Poll 2"), block.timestamp + 1 days, 3);
+        vm.stopPrank();
+
+        assertEq(voting.s_pollCounter(), 2);
+    }
+
+    function testGetPollCountZero() public {
+        assertEq(voting.s_pollCounter(), 0);
+    }
 }
