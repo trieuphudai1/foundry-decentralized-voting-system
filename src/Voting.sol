@@ -51,6 +51,12 @@ contract Voting is Ownable, ReentrancyGuard {
         _;
     }
 
+    // Events
+    event PollCreated(uint256 pollId, bytes32 contentHash, uint256 deadline);
+    event Voted(uint256 pollId, address voter, uint256 option);
+    event PollEnded(uint256 pollId);
+    event WhitelistAdded(uint256 pollId, address voter);
+
     // Functions
     function createPoll(bytes32 _contentHash, uint256 _deadline, uint256 _optionCount) external onlyOwner {
         require(_deadline > block.timestamp, "Deadline must be in the future");
@@ -62,11 +68,15 @@ contract Voting is Ownable, ReentrancyGuard {
         optionCount[pollId] = _optionCount;
 
         s_pollCounter++;
+
+        emit PollCreated(pollId, _contentHash, _deadline);
     }
 
     function endPoll(uint256 _pollId) external onlyOwner pollExists(_pollId) {
         require(polls[_pollId].isActive, "Already ended");
         polls[_pollId].isActive = false;
+
+        emit PollEnded(_pollId);
     }
 
     function addToWhitelist(uint256 _pollId, address[] calldata _voters) external onlyOwner pollExists(_pollId) {
@@ -74,6 +84,8 @@ contract Voting is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < voterLength; i++) {
             whitelist[_pollId][_voters[i]] = true;
         }
+
+        emit WhitelistAdded(_pollId, msg.sender);
     }
 
     function vote(uint256 _pollId, uint256 _option)
@@ -90,6 +102,8 @@ contract Voting is Ownable, ReentrancyGuard {
         hasVoted[_pollId][msg.sender] = true;
 
         voteCounts[_pollId][_option]++;
+
+        emit Voted(_pollId, msg.sender, _option);
     }
 
     function isWhitelisted(uint256 _pollId, address _voter) external view returns (bool) {
