@@ -80,6 +80,7 @@ contract Voting is Ownable, ReentrancyGuard {
     }
 
     function addToWhitelist(uint256 _pollId, address[] calldata _voters) external onlyOwner pollExists(_pollId) {
+        require(_voters.length > 0, "Empty list");
         uint256 voterLength = _voters.length;
         for (uint256 i = 0; i < voterLength; i++) {
             whitelist[_pollId][_voters[i]] = true;

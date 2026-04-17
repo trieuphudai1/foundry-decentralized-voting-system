@@ -126,12 +126,9 @@ contract VotingTest is Test {
         vm.prank(OWNER);
         voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
 
-        // Act
+        vm.expectRevert("Empty list");
         vm.prank(OWNER);
         voting.addToWhitelist(0, new address[](0));
-
-        // Assert - No reverts and whitelist remains unchanged
-        assertFalse(voting.whitelist(0, makeAddr("Voter1")));
     }
 
     function testAddToWhitelistDuplicateVoters() public {
