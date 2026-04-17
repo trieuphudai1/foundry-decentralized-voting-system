@@ -374,4 +374,42 @@ contract VotingTest is Test {
         assertTrue(voting.hasVoted(0, voter2));
         assertEq(voting.voteCounts(0, 0), 2);
     }
+
+    function testEndPollSuccess() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.prank(OWNER);
+        voting.endPoll(0);
+
+        (, , , bool isActive) = voting.polls(0);
+        assertFalse(isActive);
+    }
+
+    function testEndPollRevertIfNotOwner() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.expectRevert();
+        vm.prank(USER);
+        voting.endPoll(0);
+    }
+
+    function testEndPollRevertIfPollDoesNotExist() public {
+        vm.expectRevert("Poll does not exist");
+        vm.prank(OWNER);
+        voting.endPoll(999);
+    }
+
+    function testEndPollAlreadyEnded() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.prank(OWNER);
+        voting.endPoll(0);
+
+        vm.expectRevert("Already ended");
+        vm.prank(OWNER);
+        voting.endPoll(0);
+    }
 }

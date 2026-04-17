@@ -65,6 +65,7 @@ contract Voting is Ownable, ReentrancyGuard {
     }
 
     function endPoll(uint256 _pollId) external onlyOwner pollExists(_pollId) {
+        require(polls[_pollId].isActive, "Already ended");
         polls[_pollId].isActive = false;
     }
 
