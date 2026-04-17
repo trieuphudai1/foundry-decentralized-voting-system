@@ -97,6 +97,7 @@ contract Voting is Ownable, ReentrancyGuard {
     }
 
     function getVoteCount(uint256 _pollId, uint256 _option) external view returns (uint256) {
+        require(_option < optionCount[_pollId], "Invalid option");
         return voteCounts[_pollId][_option];
     }
 

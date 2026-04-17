@@ -466,4 +466,31 @@ contract VotingTest is Test {
         assertEq(voting.getVoteCount(0, 1), 0);
         assertEq(voting.getVoteCount(0, 2), 0);
     }
+
+    function testGetVoteCountInvalidOption() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.expectRevert();
+        voting.getVoteCount(0, 2); // Invalid option index
+    }
+
+    function testHasUserVoted() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        assertFalse(voting.hasUserVoted(0, voter));
+
+        vm.prank(voter);
+        voting.vote(0, 0);
+
+        assertTrue(voting.hasUserVoted(0, voter));
+    }
 }
