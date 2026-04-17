@@ -435,4 +435,35 @@ contract VotingTest is Test {
 
         assertFalse(voting.isWhitelisted(0, voter));
     }
+
+    function testGetVoteCount() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 3);
+
+        address voter1 = makeAddr("Voter1");
+        address voter2 = makeAddr("Voter2");
+        address[] memory voters = new address[](2);
+        voters[0] = voter1;
+        voters[1] = voter2;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.prank(voter1);
+        voting.vote(0, 0);
+
+        vm.prank(voter2);
+        voting.vote(0, 0);
+
+        assertEq(voting.getVoteCount(0, 0), 2);
+    }
+
+    function testGetVoteCountZero() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 3);
+
+        assertEq(voting.getVoteCount(0, 0), 0);
+        assertEq(voting.getVoteCount(0, 1), 0);
+        assertEq(voting.getVoteCount(0, 2), 0);
+    }
 }
