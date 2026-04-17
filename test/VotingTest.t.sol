@@ -493,4 +493,21 @@ contract VotingTest is Test {
 
         assertTrue(voting.hasUserVoted(0, voter));
     }
+
+    function testGetPollSuccess() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        (uint256 id, bytes32 contentHash, uint256 deadline, bool isActive) = voting.getPoll(0);
+
+        assertEq(id, 0);
+        assertEq(contentHash, keccak256("Poll"));
+        assertEq(deadline, block.timestamp + 1 days);
+        assertTrue(isActive);
+    }
+
+    function testGetPollRevertIfPollDoesNotExist() public {
+        vm.expectRevert("Poll does not exist");
+        voting.getPoll(999);
+    }
 }
