@@ -104,4 +104,9 @@ contract Voting is Ownable, ReentrancyGuard {
     function hasUserVoted(uint256 _pollId, address _voter) external view returns (bool) {
         return hasVoted[_pollId][_voter];
     }
+
+    function getPoll(uint256 _pollId) external view returns (Poll memory) {
+        require(_pollId < s_pollCounter, "Poll does not exist");
+        return polls[_pollId];
+    }
 }
