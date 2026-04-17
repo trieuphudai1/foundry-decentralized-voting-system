@@ -95,4 +95,8 @@ contract Voting is Ownable, ReentrancyGuard {
     function isWhitelisted(uint256 _pollId, address _voter) external view returns (bool) {
         return whitelist[_pollId][_voter];
     }
+
+    function getVoteCount(uint256 _pollId, uint256 _option) external view returns (uint256) {
+        return voteCounts[_pollId][_option];
+    }
 }
