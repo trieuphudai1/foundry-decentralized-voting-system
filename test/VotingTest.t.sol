@@ -520,4 +520,56 @@ contract VotingTest is Test {
     function testGetPollCountZero() public {
         assertEq(voting.s_pollCounter(), 0);
     }
+
+    function testCreatePollEmitsEvent() public {
+        bytes32 contentHash = keccak256("Poll");
+        uint256 deadline = block.timestamp + 1 days;
+        uint256 optionCount = 2;
+
+        vm.prank(OWNER);
+        vm.expectEmit(false, false, false, true);
+        emit Voting.PollCreated(0, contentHash, deadline);
+
+        voting.createPoll(contentHash, deadline, optionCount);
+    }
+
+    function testEndPollEmitsEventEarly() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.prank(OWNER);
+        vm.expectEmit(false, false, false, true);
+        emit Voting.PollEnded(0, Voting.EndReason.EndedByAdmin);
+
+        voting.endPoll(0);
+    }
+
+    function testEndPollEmitsEventDeadline() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(OWNER);
+        vm.expectEmit(false, false, false, true);
+        emit Voting.PollEnded(0, Voting.EndReason.DeadlineReached);
+
+        voting.endPoll(0);
+    }
+
+    function testAddToWhitelistEmitsEvent() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address[] memory voters = new address[](3);
+        voters[0] = makeAddr("Voter1");
+        voters[1] = makeAddr("Voter2");
+        voters[2] = makeAddr("Voter3");
+
+        vm.prank(OWNER);
+        vm.expectEmit(false, false, false, true);
+        emit Voting.WhitelistBatchAdded(0, 3);
+
+        voting.addToWhitelist(0, voters);
+    }
 }

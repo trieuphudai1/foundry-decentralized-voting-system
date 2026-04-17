@@ -11,6 +11,13 @@ contract Voting is Ownable, ReentrancyGuard {
     // Constructor
     constructor(address initialOwner) Ownable(initialOwner) {}
 
+    // Enums: replace string reason with enum for better gas efficiency
+    enum EndReason {
+        DeadlineReached,
+        EndedByAdmin
+    }
+
+    // Structs
     struct Poll {
         uint256 id;
         bytes32 contentHash;
@@ -54,8 +61,8 @@ contract Voting is Ownable, ReentrancyGuard {
     // Events
     event PollCreated(uint256 pollId, bytes32 contentHash, uint256 deadline);
     event Voted(uint256 pollId, address voter, uint256 option);
-    event PollEnded(uint256 pollId);
-    event WhitelistAdded(uint256 pollId, address voter);
+    event PollEnded(uint256 pollId, EndReason reason);
+    event WhitelistBatchAdded(uint256 pollId, uint256 count);
 
     // Functions
     function createPoll(bytes32 _contentHash, uint256 _deadline, uint256 _optionCount) external onlyOwner {
@@ -76,7 +83,9 @@ contract Voting is Ownable, ReentrancyGuard {
         require(polls[_pollId].isActive, "Already ended");
         polls[_pollId].isActive = false;
 
-        emit PollEnded(_pollId);
+        bool isEarly = block.timestamp < polls[_pollId].deadline;
+
+        emit PollEnded(_pollId, isEarly ? EndReason.EndedByAdmin : EndReason.DeadlineReached);
     }
 
     function addToWhitelist(uint256 _pollId, address[] calldata _voters) external onlyOwner pollExists(_pollId) {
@@ -86,7 +95,7 @@ contract Voting is Ownable, ReentrancyGuard {
             whitelist[_pollId][_voters[i]] = true;
         }
 
-        emit WhitelistAdded(_pollId, msg.sender);
+        emit WhitelistBatchAdded(_pollId, voterLength);
     }
 
     function vote(uint256 _pollId, uint256 _option)
@@ -96,7 +105,6 @@ contract Voting is Ownable, ReentrancyGuard {
         onlyWhitelisted(_pollId)
         notVoted(_pollId)
         beforeDeadline(_pollId)
-        nonReentrant
     {
         require(_option < optionCount[_pollId], "Invalid option");
 
