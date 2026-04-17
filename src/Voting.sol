@@ -75,7 +75,15 @@ contract Voting is Ownable, ReentrancyGuard {
         }
     }
 
-    function vote(uint256 _pollId, uint256 _option) external pollExists(_pollId) pollActive(_pollId) onlyWhitelisted(_pollId) notVoted(_pollId) beforeDeadline(_pollId) nonReentrant {
+    function vote(uint256 _pollId, uint256 _option)
+        external
+        pollExists(_pollId)
+        pollActive(_pollId)
+        onlyWhitelisted(_pollId)
+        notVoted(_pollId)
+        beforeDeadline(_pollId)
+        nonReentrant
+    {
         require(_option < optionCount[_pollId], "Invalid option");
 
         hasVoted[_pollId][msg.sender] = true;
