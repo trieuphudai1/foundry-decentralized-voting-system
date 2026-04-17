@@ -59,6 +59,10 @@ contract Voting is Ownable, ReentrancyGuard {
         s_pollCounter++;
     }
 
+    function endPoll(uint256 _pollId) external onlyOwner pollExists(_pollId) {
+        polls[_pollId].isActive = false;
+    }
+
     function addToWhitelist(uint256 _pollId, address[] calldata _voters) external onlyOwner pollExists(_pollId) {
         uint256 voterLength = _voters.length;
         for (uint256 i = 0; i < voterLength; i++) {
@@ -66,7 +70,14 @@ contract Voting is Ownable, ReentrancyGuard {
         }
     }
 
-    function vote(uint256 _pollId, uint256 _option) external pollExists(_pollId) pollActive(_pollId) onlyWhitelisted(_pollId) notVoted(_pollId) nonReentrant {
+    function vote(uint256 _pollId, uint256 _option)
+        external
+        pollExists(_pollId)
+        pollActive(_pollId)
+        onlyWhitelisted(_pollId)
+        notVoted(_pollId)
+        nonReentrant
+    {
         require(_option < optionCount[_pollId], "Invalid option");
 
         hasVoted[_pollId][msg.sender] = true;
