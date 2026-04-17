@@ -46,6 +46,11 @@ contract Voting is Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier beforeDeadline(uint256 _pollId) {
+        require(block.timestamp < polls[_pollId].deadline, "Poll expired");
+        _;
+    }
+
     // Functions
     function createPoll(bytes32 _contentHash, uint256 _deadline, uint256 _optionCount) external onlyOwner {
         require(_deadline > block.timestamp, "Deadline must be in the future");
@@ -70,14 +75,7 @@ contract Voting is Ownable, ReentrancyGuard {
         }
     }
 
-    function vote(uint256 _pollId, uint256 _option)
-        external
-        pollExists(_pollId)
-        pollActive(_pollId)
-        onlyWhitelisted(_pollId)
-        notVoted(_pollId)
-        nonReentrant
-    {
+    function vote(uint256 _pollId, uint256 _option) external pollExists(_pollId) pollActive(_pollId) onlyWhitelisted(_pollId) notVoted(_pollId) beforeDeadline(_pollId) nonReentrant {
         require(_option < optionCount[_pollId], "Invalid option");
 
         hasVoted[_pollId][msg.sender] = true;

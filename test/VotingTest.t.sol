@@ -187,4 +187,191 @@ contract VotingTest is Test {
         assertTrue(voting.whitelist(0, voter));
         assertFalse(voting.whitelist(1, voter));
     }
+
+    function testVoteSuccess() public {
+        // Arrange
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll 1"), block.timestamp + 1 days, 3);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        // Act
+        vm.prank(voter);
+        voting.vote(0, 1);
+
+        // Assert
+        assertTrue(voting.hasVoted(0, voter));
+        assertEq(voting.voteCounts(0, 1), 1);
+    }
+
+    function testVoteRevertIfPollDoesNotExist() public {
+        vm.expectRevert("Poll does not exist");
+        vm.prank(USER);
+        voting.vote(999, 0);
+    }
+
+    function testVoteRevertIfPollNotActive() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+        vm.prank(OWNER);
+        voting.endPoll(0);
+        vm.expectRevert("Poll is not active");
+        vm.prank(USER);
+        voting.vote(0, 0);
+    }
+
+    function testVoteRevertIfNotWhitelisted() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+        vm.expectRevert("Not whitelisted to vote");
+        vm.prank(USER);
+        voting.vote(0, 0);
+    }
+
+    function testVoteRevertIfAlreadyVoted() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.prank(voter);
+        voting.vote(0, 0);
+
+        vm.expectRevert("Already voted");
+        vm.prank(voter);
+        voting.vote(0, 1);
+    }
+
+    function testVoteRevertIfInvalidOption() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.expectRevert("Invalid option");
+        vm.prank(voter);
+        voting.vote(0, 2); // Invalid option index
+    }
+
+    function testVoteRevertIfPollExpired() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.expectRevert("Poll expired");
+        vm.prank(voter);
+        voting.vote(0, 0);
+    }
+
+    function testVoteWithMaxValidOption() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 3);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.prank(voter);
+        voting.vote(0, 2); // Max valid option index
+
+        assertTrue(voting.hasVoted(0, voter));
+        assertEq(voting.voteCounts(0, 2), 1);
+    }
+
+    function testVoteStateUnchangedOnRevert() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter = makeAddr("Voter");
+        address[] memory voters = new address[](1);
+        voters[0] = voter;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        // Attempt to vote with invalid option
+        vm.expectRevert("Invalid option");
+        vm.prank(voter);
+        voting.vote(0, 2); // Invalid option index
+
+        // Assert state unchanged
+        assertFalse(voting.hasVoted(0, voter));
+        assertEq(voting.voteCounts(0, 0), 0);
+        assertEq(voting.voteCounts(0, 1), 0);
+    }
+
+    function testVoteMultipleVotes() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter1 = makeAddr("Voter1");
+        address voter2 = makeAddr("Voter2");
+        address[] memory voters = new address[](2);
+        voters[0] = voter1;
+        voters[1] = voter2;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.prank(voter1);
+        voting.vote(0, 0);
+
+        vm.prank(voter2);
+        voting.vote(0, 1);
+
+        assertTrue(voting.hasVoted(0, voter1));
+        assertTrue(voting.hasVoted(0, voter2));
+        assertEq(voting.voteCounts(0, 0), 1);
+        assertEq(voting.voteCounts(0, 1), 1);
+    }
+
+    function testVoteMultipleSameOption() public {
+        vm.prank(OWNER);
+        voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
+
+        address voter1 = makeAddr("Voter1");
+        address voter2 = makeAddr("Voter2");
+        address[] memory voters = new address[](2);
+        voters[0] = voter1;
+        voters[1] = voter2;
+
+        vm.prank(OWNER);
+        voting.addToWhitelist(0, voters);
+
+        vm.prank(voter1);
+        voting.vote(0, 0);
+
+        vm.prank(voter2);
+        voting.vote(0, 0);
+
+        assertTrue(voting.hasVoted(0, voter1));
+        assertTrue(voting.hasVoted(0, voter2));
+        assertEq(voting.voteCounts(0, 0), 2);
+    }
 }
