@@ -99,4 +99,8 @@ contract Voting is Ownable, ReentrancyGuard {
     function getVoteCount(uint256 _pollId, uint256 _option) external view returns (uint256) {
         return voteCounts[_pollId][_option];
     }
+
+    function hasUserVoted(uint256 _pollId, address _voter) external view returns (bool) {
+        return hasVoted[_pollId][_voter];
+    }
 }
