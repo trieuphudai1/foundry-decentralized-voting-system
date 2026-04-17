@@ -23,6 +23,7 @@ contract Voting is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => bool)) public hasVoted;
     mapping(uint256 => mapping(address => bool)) public whitelist;
     mapping(uint256 => uint256) public optionCount;
+    mapping(uint256 => mapping(uint256 => uint256)) public voteCounts;
 
     // Modifiers
     modifier pollExists(uint256 _pollId) {
@@ -30,7 +31,7 @@ contract Voting is Ownable, ReentrancyGuard {
         _;
     }
 
-    modifier poolActive(uint256 _pollId) {
+    modifier pollActive(uint256 _pollId) {
         require(polls[_pollId].isActive, "Poll is not active");
         _;
     }
@@ -63,5 +64,13 @@ contract Voting is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < voterLength; i++) {
             whitelist[_pollId][_voters[i]] = true;
         }
+    }
+
+    function vote(uint256 _pollId, uint256 _option) external pollExists(_pollId) pollActive(_pollId) onlyWhitelisted(_pollId) notVoted(_pollId) nonReentrant {
+        require(_option < optionCount[_pollId], "Invalid option");
+
+        hasVoted[_pollId][msg.sender] = true;
+
+        voteCounts[_pollId][_option]++;
     }
 }
