@@ -382,7 +382,7 @@ contract VotingTest is Test {
         vm.prank(OWNER);
         voting.endPoll(0);
 
-        (, , , bool isActive) = voting.polls(0);
+        (,,, bool isActive) = voting.polls(0);
         assertFalse(isActive);
     }
 
