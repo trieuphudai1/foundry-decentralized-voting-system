@@ -89,49 +89,78 @@ forge script script/DeployVoting.s.sol \
   --broadcast
 ```
 
+## ✅ Verify Contract on Etherscan
+
+```
+forge verify-contract \
+  --chain sepolia \
+  --compiler-version v0.8.33 \
+  $CONTRACT_ADDRESS \
+  src/Voting.sol:Voting \
+  --etherscan-api-key $ETHERSCAN_API_KEY
+```
+
 ## 🧪 Example Interactions (cast)
 
 ### Create Poll
 
 ```
-cast send <CONTRACT_ADDRESS> \
+cast send $CONTRACT_ADDRESS \
 "createPoll(bytes32,uint256,uint256)" \
 <CONTENT_HASH> <DEADLINE> <OPTION_COUNT> \
---private-key $PRIVATE_KEY
+--private-key $PRIVATE_KEY \
+--rpc-url $SEPOLIA_RPC_URL
 ```
 
 ```
-cast send <CONTRACT_ADDRESS> \
+cast send $CONTRACT_ADDRESS \
 "createPoll(bytes32,uint256,uint256)" \
 $(cast keccak "Favorite Language|Choose your favorite programming language") \
 $(date -d "+1 day" +%s) \
 3 \
---private-key $PRIVATE_KEY
+--private-key $PRIVATE_KEY \
+--rpc-url $SEPOLIA_RPC_URL
 ```
 
 ### Add Whitelist
 
 ```
-cast send <CONTRACT_ADDRESS> \
+cast send $CONTRACT_ADDRESS \
 "addToWhitelist(uint256,address[])" \
 0 "[0xAddress1,0xAddress2]" \
---private-key $PRIVATE_KEY
+--private-key $PRIVATE_KEY \
+--rpc-url $SEPOLIA_RPC_URL
 ```
 
 ### Vote
 
 ```
-cast send <CONTRACT_ADDRESS> \
+cast send $CONTRACT_ADDRESS \
 "vote(uint256,uint256)" \
 0 1 \
---private-key $PRIVATE_KEY
+--private-key $PRIVATE_KEY \
+--rpc-url $SEPOLIA_RPC_URL
 ```
 
 ### End Poll
 
 ```
-cast send <CONTRACT_ADDRESS> \
+cast send $CONTRACT_ADDRESS \
 "endPoll(uint256)" \
 0 \
---private-key $PRIVATE_KEY
+--private-key $PRIVATE_KEY \
+--rpc-url $SEPOLIA_RPC_URL
+```
+
+### Get Poll
+```
+cast call $CONTRACT_ADDRESS \
+"getPoll(uint256)" \
+0 \
+--rpc-url $SEPOLIA_RPC_URL
+```
+
+### Poll name, Description
+```
+cast keccak "Favorite Language|Choose your favorite programming language"
 ```
