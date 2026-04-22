@@ -28,13 +28,15 @@ Each poll includes:
 - `deadline`
 - `isActive`
 
-### Security
+### Security Highlights
 
-- `Ownable` → restrict admin functions
-- `ReentrancyGuard` → prevent reentrancy attacks
-- Whitelist → prevent Sybil attack
-
----
+- Prevents double voting using `hasVoted`
+- Uses whitelist to prevent Sybil attacks
+- Enforces deadline to ensure valid voting period
+- No external calls → resistant to reentrancy
+- Uses OpenZeppelin `ReentrancyGuard` (future-proof)
+- Follows Check-Effects pattern
+- Strong access control with `Ownable`
 
 ## ⚙️ Tech Stack
 
