@@ -69,6 +69,24 @@ Cài đặt các thư viện cần thiết (OpenZeppelin, etc.):
 forge install
 ```
 
+## 🚀 Deploy Smart Contract
+
+### 1. Setup environment variables
+
+Thiết lập biến môi trường:
+```
+export SEPOLIA_RPC_URL=your_rpc_url
+export PRIVATE_KEY=your_private_key
+```
+
+### 2. Deploy contract
+```
+forge script script/DeployVoting.s.sol \
+  --rpc-url $SEPOLIA_RPC_URL \
+  --private-key $PRIVATE_KEY \
+  --broadcast
+```
+
 ## 🧪 Example Interactions (cast)
 
 ### Create Poll
@@ -77,6 +95,15 @@ forge install
 cast send <CONTRACT_ADDRESS> \
 "createPoll(bytes32,uint256,uint256)" \
 <CONTENT_HASH> <DEADLINE> <OPTION_COUNT> \
+--private-key $PRIVATE_KEY
+```
+
+```
+cast send <CONTRACT_ADDRESS> \
+"createPoll(bytes32,uint256,uint256)" \
+$(cast keccak "Favorite Language|Choose your favorite programming language") \
+$(date -d "+1 day" +%s) \
+3 \
 --private-key $PRIVATE_KEY
 ```
 
