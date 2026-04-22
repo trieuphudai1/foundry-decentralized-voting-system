@@ -1,67 +1,108 @@
-## Foundry
+# 📌 Decentralized Voting System (Smart Contract)
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+A decentralized voting system built on Ethereum using Solidity and Foundry.  
+This project ensures transparency, immutability, and prevents double voting using blockchain technology.
 
-Foundry consists of:
+---
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## 🚀 Features
 
-## Documentation
+- Create polls (Admin only)
+- Whitelist voters (batch)
+- One wallet = one vote
+- Deadline-based voting
+- End poll manually or automatically
+- On-chain vote counting
+- Hybrid architecture (On-chain + Off-chain hash verification)
 
-https://book.getfoundry.sh/
+---
 
-## Usage
+## 🧱 Smart Contract Overview
 
-### Build
+### Core Concepts
 
-```shell
-$ forge build
+Each poll includes:
+
+- `id`
+- `contentHash` (keccak256 of off-chain data)
+- `deadline`
+- `isActive`
+
+### Security
+
+- `Ownable` → restrict admin functions
+- `ReentrancyGuard` → prevent reentrancy attacks
+- Whitelist → prevent Sybil attack
+
+---
+
+## ⚙️ Tech Stack
+
+- Solidity `^0.8.18`
+- Foundry
+- OpenZeppelin Contracts
+- Ethereum (Sepolia Testnet)
+
+---
+
+## 📦 Installation (Foundry)
+
+### 1. Install Foundry
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
 ```
 
-### Test
+### 2. Clone project
 
-```shell
-$ forge test
+```bash
+git clone https://github.com/trieuphudai1/decentralized-voting.git
+cd decentralized-voting
 ```
 
-### Format
+### 3. Install dependencies
 
-```shell
-$ forge fmt
+Cài đặt các thư viện cần thiết (OpenZeppelin, etc.):
+
+```bash
+forge install
 ```
 
-### Gas Snapshots
+## 🧪 Example Interactions (cast)
 
-```shell
-$ forge snapshot
+### Create Poll
+
+```
+cast send <CONTRACT_ADDRESS> \
+"createPoll(bytes32,uint256,uint256)" \
+<CONTENT_HASH> <DEADLINE> <OPTION_COUNT> \
+--private-key $PRIVATE_KEY
 ```
 
-### Anvil
+### Add Whitelist
 
-```shell
-$ anvil
+```
+cast send <CONTRACT_ADDRESS> \
+"addToWhitelist(uint256,address[])" \
+0 "[0xAddress1,0xAddress2]" \
+--private-key $PRIVATE_KEY
 ```
 
-### Deploy
+### Vote
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+cast send <CONTRACT_ADDRESS> \
+"vote(uint256,uint256)" \
+0 1 \
+--private-key $PRIVATE_KEY
 ```
 
-### Cast
+### End Poll
 
-```shell
-$ cast <subcommand>
 ```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+cast send <CONTRACT_ADDRESS> \
+"endPoll(uint256)" \
+0 \
+--private-key $PRIVATE_KEY
 ```
-# foundry-decentralized-voting-system
