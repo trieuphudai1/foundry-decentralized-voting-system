@@ -9,11 +9,9 @@ contract DeployVoting is Script {
         // Start broadcasting transactions
         vm.startBroadcast();
 
-        // Deploy the Voting contract with the deployer as the initial owner
         address deployer = msg.sender;
         Voting voting = new Voting(deployer);
 
-        // Stop broadcasting transactions
         vm.stopBroadcast();
     }
 }
