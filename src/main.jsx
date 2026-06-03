@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { RainbowKitProvider, ConnectButton } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, useAccount } from "wagmi";
+import { parseEventLogs } from "viem";
 import {
   BadgeCheck,
   BarChart3,
@@ -36,6 +37,7 @@ import {
   X
 } from "lucide-react";
 import { wagmiConfig, sepolia } from "./web3/config";
+import { savePollMetadata } from "./services/pollApi";
 import {
   buildContentHash,
   getFriendlyError,
@@ -46,7 +48,7 @@ import {
   usePolls,
   useVotingWrite
 } from "./web3/hooks";
-import { VOTING_CONTRACT_ADDRESS } from "./web3/votingContract";
+import { VOTING_CONTRACT_ADDRESS, votingAbi } from "./web3/votingContract";
 import "./styles.css";
 
 const queryClient = new QueryClient();
@@ -82,6 +84,19 @@ function App() {
 
   const selectedPoll = pollsState.polls.find((poll) => poll.id.toString() === selectedPollId) || pollsState.polls[0];
 
+  const retrySaveMetadata = async () => {
+    if (!tx.retryMetadata) return;
+    try {
+      setTx({ ...tx, status: "pending", title: "Retrying metadata save", text: "Saving poll metadata to MongoDB." });
+      await savePollMetadata(tx.retryMetadata);
+      await pollsState.refetch();
+      setTx({ status: "success", title: "Metadata saved", text: `Poll #${tx.retryMetadata.pollId} metadata is now stored in MongoDB.`, hash: tx.hash });
+      setRoute("polls");
+    } catch (error) {
+      setTx({ ...tx, status: "error", title: "Metadata save failed", text: getFriendlyError(error) || error.message });
+    }
+  };
+
   return (
     <div className="app-shell">
       <div className="ambient ambient-one" />
@@ -93,10 +108,10 @@ function App() {
         {route === "detail" && <PollDetail poll={selectedPoll} setRoute={setRoute} setTx={setTx} refetchPolls={pollsState.refetch} />}
         {route === "results" && <Results poll={selectedPoll} setRoute={setRoute} />}
         {route === "dashboard" && <AdminDashboard pollsState={pollsState} setRoute={setRoute} setTx={setTx} />}
-        {route === "create" && <CreatePoll setRoute={setRoute} setTx={setTx} refetchPolls={pollsState.refetch} />}
+        {route === "create" && <CreatePoll hasPollCount={pollsState.hasCount} pollCount={pollsState.count} setRoute={setRoute} setTx={setTx} refetchPolls={pollsState.refetch} />}
         {route === "whitelist" && <Whitelist polls={pollsState.polls} setTx={setTx} refetchPolls={pollsState.refetch} />}
       </main>
-      <StatusDock tx={tx} onClose={() => setTx({ status: "idle", title: "No transaction yet", text: "Submit a transaction to see live status here." })} />
+      <StatusDock tx={tx} onClose={() => setTx({ status: "idle", title: "No transaction yet", text: "Submit a transaction to see live status here." })} onRetry={retrySaveMetadata} />
     </div>
   );
 }
@@ -181,7 +196,7 @@ function PollsList({ pollsState, onSelect }) {
 
   return (
     <section className="page-panel">
-      <PageTitle title="Polls" subtitle="Loaded from the deployed Voting contract on Sepolia" />
+      <PageTitle title="Polls" subtitle="Metadata from MongoDB, state from the Voting contract on Sepolia" />
       <div className="contract-line">Contract: <strong>{shortAddress(VOTING_CONTRACT_ADDRESS)}</strong></div>
       <div className="list-toolbar">
         <label className="search-box">
@@ -201,15 +216,16 @@ function PollsList({ pollsState, onSelect }) {
         {visiblePolls.map((poll) => (
           <article className="poll-card" key={poll.id.toString()}>
             <div className="card-head">
-              <h3>Poll #{poll.id.toString()}</h3>
+              <h3>{poll.title}</h3>
               <StatusTag status={poll.isActive && !poll.isExpired ? "Active" : "Closed"} />
             </div>
-            <p>{poll.contentHash}</p>
+            <p>{poll.description}</p>
             <div className="meta-row">
               <span><small>{poll.isActive && !poll.isExpired ? "Ends" : "Ended"}</small>{formatDeadline(poll.deadline)}</span>
               <span><small>Options</small>{poll.optionCount.toString()}</span>
-              <span className="verified"><BadgeCheck size={13} /> Verified</span>
+              <IntegrityBadge integrity={poll.integrity} />
             </div>
+            <small className="contract-line">Poll #{poll.id.toString()} - {shortHash(poll.contentHash)}</small>
             <button className={poll.isActive && !poll.isExpired ? "primary full" : "secondary full"} onClick={() => onSelect(poll)}>
               {poll.isActive && !poll.isExpired ? "View Poll" : "View Results"}
             </button>
@@ -254,19 +270,20 @@ function PollDetail({ poll, setRoute, setTx, refetchPolls }) {
       <div className="detail-info">
         <BackButton onClick={() => setRoute("polls")} label="Back to Polls" />
         <div className="title-line">
-          <h2>Poll #{poll.id.toString()}</h2>
+          <h2>{poll.title}</h2>
           <StatusTag status={poll.isActive && !poll.isExpired ? "Active" : "Closed"} />
         </div>
-        <p>Content is represented by an immutable bytes32 hash stored on-chain.</p>
+        <p>{poll.description}</p>
         <dl className="detail-list">
           <Detail icon={<UserRound />} label="Connected wallet" value={address ? shortAddress(address) : "Not connected"} />
+          <Detail icon={<Fingerprint />} label="Poll ID" value={`#${poll.id.toString()}`} />
           <Detail icon={<Clock3 />} label="Deadline" value={formatDeadline(poll.deadline)} />
           <Detail icon={<UsersRound />} label="Total votes" value={totalVotes.toString()} />
           <Detail icon={<Vote />} label="Your status" value={detail.hasVoted ? "Voted" : "Not voted"} danger={!detail.hasVoted} />
           <Detail icon={<LockKeyhole />} label="Whitelist" value={detail.isWhitelisted ? "Allowed" : "Not whitelisted"} danger={!detail.isWhitelisted} />
           <Detail icon={<Link2 />} label="Content hash" value={shortHash(poll.contentHash)} copy />
         </dl>
-        <span className="hash-ok"><BadgeCheck size={14} /> Blockchain Hash Verified</span>
+        <IntegrityNotice integrity={poll.integrity} />
       </div>
       <div className="vote-card">
         <h3>Choose your option</h3>
@@ -274,7 +291,7 @@ function PollDetail({ poll, setRoute, setTx, refetchPolls }) {
           {detail.options.map((option) => (
             <button className={selectedOption === option.index ? "selected" : ""} onClick={() => setSelectedOption(option.index)} key={option.index}>
               <span className="radio-dot" />
-              <span><strong>Option {option.index}</strong><small>{option.votes.toString()} votes</small></span>
+              <span><strong>{poll.options[option.index] || `Option ${option.index}`}</strong><small>{option.votes.toString()} votes</small></span>
             </button>
           ))}
         </div>
@@ -295,10 +312,10 @@ function Results({ poll, setRoute }) {
     <section className="page-panel results-panel">
       <BackButton onClick={() => setRoute("polls")} label="Back to Polls" />
       <div className="title-line">
-        <h2>Poll #{poll.id.toString()}</h2>
+        <h2>{poll.title}</h2>
         <StatusTag status={poll.isActive && !poll.isExpired ? "Active" : "Closed"} />
       </div>
-      <p>Results are read directly from the Voting contract.</p>
+      <p>{poll.description}</p>
       <div className="result-summary">
         <Summary icon={<Vote />} label="Total Votes" value={total.toString()} />
         <Summary icon={<UsersRound />} label="Options" value={poll.optionCount.toString()} />
@@ -310,7 +327,7 @@ function Results({ poll, setRoute }) {
           const percentage = total === 0n ? 0 : Number((option.votes * 100n) / total);
           return (
             <div className="bar-row" key={option.index}>
-              <div><strong>Option {option.index}</strong><small>Index starts at 0</small></div>
+              <div><strong>{poll.options[option.index] || `Option ${option.index}`}</strong><small>Index {option.index}</small></div>
               <div className="bar-track"><span className="bar-fill blue" style={{ width: `${percentage}%` }} /></div>
               <span>{percentage}%</span>
               <small>({option.votes.toString()} votes)</small>
@@ -318,7 +335,7 @@ function Results({ poll, setRoute }) {
           );
         })}
       </div>
-      <div className="notice"><ShieldCheck size={16} /> Results are immutable and verified on Ethereum Sepolia.</div>
+      <IntegrityNotice integrity={poll.integrity} />
     </section>
   );
 }
@@ -377,7 +394,7 @@ function AdminPollRow({ poll, disabled, setTx, refetchPolls }) {
   return (
     <div className="recent-row">
       <Avatar />
-      <span><strong>Poll #{poll.id.toString()}</strong><small>{poll.isActive ? "Active" : "Closed"} - {formatDeadline(poll.deadline)}</small></span>
+      <span><strong>{poll.title}</strong><small>Poll #{poll.id.toString()} - {poll.isActive ? "Active" : "Closed"} - {formatDeadline(poll.deadline)}</small></span>
       <button className="secondary compact-action" onClick={closePoll} disabled={disabled || !poll.isActive || writer.isBusy}>
         {writer.isBusy ? "..." : "End"}
       </button>
@@ -385,15 +402,40 @@ function AdminPollRow({ poll, disabled, setTx, refetchPolls }) {
   );
 }
 
-function CreatePoll({ setRoute, setTx, refetchPolls }) {
+function CreatePoll({ hasPollCount, pollCount, setRoute, setTx, refetchPolls }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [options, setOptions] = useState(["", ""]);
-  const writer = useVotingWrite(async (hash) => {
-    await refetchPolls();
-    setTx({ status: "success", title: "Poll created", text: "Poll list refreshed from contract.", hash });
-    setRoute("polls");
+  const metadataDraft = useRef(null);
+  const writer = useVotingWrite(async (hash, receipt) => {
+    let metadata = null;
+    try {
+      const draft = metadataDraft.current;
+      const pollId = extractCreatedPollId(receipt, draft?.fallbackPollId);
+      const { fallbackPollId, ...metadataContent } = draft;
+      metadata = {
+        ...metadataContent,
+        pollId,
+        txHash: hash
+      };
+
+      await savePollMetadata(metadata);
+      await refetchPolls();
+      metadataDraft.current = null;
+      setTx({ status: "success", title: "Poll created", text: "Poll metadata saved and list refreshed.", hash });
+      setRoute("polls");
+    } catch (error) {
+      setTx({
+        status: "error",
+        title: "Metadata save failed",
+        text: error.message === "Could not read pollId from PollCreated event"
+          ? "Poll was created on-chain but the pollId could not be read from the receipt."
+          : "Poll was created on-chain but metadata could not be saved. Please retry saving metadata.",
+        hash,
+        retryMetadata: metadata
+      });
+    }
   });
 
   const submit = async (event) => {
@@ -404,7 +446,15 @@ function CreatePoll({ setRoute, setTx, refetchPolls }) {
     if (cleanOptions.length < 2) return setTx({ status: "error", title: "Invalid options", text: "At least two options are required." });
     if (!deadlineSeconds || deadlineSeconds <= Math.floor(Date.now() / 1000)) return setTx({ status: "error", title: "Invalid deadline", text: "Deadline must be a future Unix timestamp in seconds." });
     try {
-      const contentHash = buildContentHash({ title, description, options: cleanOptions });
+      const contentHash = buildContentHash({ title, description });
+      metadataDraft.current = {
+        title: title.trim(),
+        description: description.trim(),
+        options: cleanOptions,
+        deadline: deadlineSeconds,
+        contentHash,
+        fallbackPollId: hasPollCount ? Number(pollCount) : null
+      };
       setTx({ status: "pending", title: "Waiting for confirmation", text: `Creating poll with hash ${shortHash(contentHash)}.` });
       const hash = await writer.write({ functionName: "createPoll", args: [contentHash, BigInt(deadlineSeconds), BigInt(cleanOptions.length)] });
       setTx({ status: "mining", title: "Creating poll", text: "Waiting for Sepolia confirmation.", hash });
@@ -417,7 +467,7 @@ function CreatePoll({ setRoute, setTx, refetchPolls }) {
     <section className="admin-layout">
       <Sidebar setRoute={setRoute} active="create" />
       <form className="create-panel" onSubmit={submit}>
-        <PageTitle title="Create New Poll" subtitle="A bytes32 content hash is generated from title, description, and options" />
+        <PageTitle title="Create New Poll" subtitle="A bytes32 content hash is generated from title and description" />
         <div className="form-grid">
           <label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Enter poll title" /></label>
           <label>End Date & Time<input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label>
@@ -483,7 +533,7 @@ function Whitelist({ polls, setTx, refetchPolls }) {
   );
 }
 
-function StatusDock({ tx, onClose }) {
+function StatusDock({ tx, onClose, onRetry }) {
   const states = {
     idle: { icon: <Clock3 />, tone: "mining" },
     pending: { icon: <Clock3 />, tone: "pending" },
@@ -502,6 +552,7 @@ function StatusDock({ tx, onClose }) {
         <span>{current.icon}</span>
         <h3>{tx.title}</h3>
         <p>{tx.text}</p>
+        {tx.retryMetadata && <button className="primary" onClick={onRetry}>Retry Save</button>}
         {tx.hash && <a className="secondary" href={`${sepolia.blockExplorers.default.url}/tx/${tx.hash}`} target="_blank" rel="noreferrer">View on Etherscan <ExternalLink size={14} /></a>}
       </div>
     </aside>
@@ -511,6 +562,8 @@ function StatusDock({ tx, onClose }) {
 function getVoteDisabledReason({ isConnected, isSepolia, poll, detail }) {
   if (!isConnected) return "Connect wallet first.";
   if (!isSepolia) return "Switch to Sepolia.";
+  if (poll?.integrity?.status === "tampered") return "Off-chain metadata hash mismatch.";
+  if (poll?.integrity?.status === "missing") return "Poll metadata is missing from MongoDB.";
   if (!poll?.isActive || poll?.isExpired) return "Poll expired or closed.";
   if (detail.hasVoted) return "Already voted.";
   if (detail.isWhitelisted === false) return "Not whitelisted.";
@@ -562,6 +615,30 @@ function StatusTag({ status }) {
   return <span className={`status ${status.toLowerCase()}`}>{status}</span>;
 }
 
+function IntegrityBadge({ integrity }) {
+  if (integrity?.status === "verified") {
+    return <span className="verified"><BadgeCheck size={13} /> Verified</span>;
+  }
+
+  if (integrity?.status === "tampered") {
+    return <span className="verified danger-text"><CircleAlert size={13} /> Tampered</span>;
+  }
+
+  return <span className="verified warning-text"><CircleAlert size={13} /> Missing</span>;
+}
+
+function IntegrityNotice({ integrity }) {
+  if (integrity?.status === "verified") {
+    return <span className="hash-ok"><BadgeCheck size={14} /> Metadata hash matches on-chain contentHash</span>;
+  }
+
+  if (integrity?.status === "tampered") {
+    return <span className="hash-ok tampered"><CircleAlert size={14} /> Warning: off-chain metadata may have been modified</span>;
+  }
+
+  return <span className="hash-ok missing"><CircleAlert size={14} /> Metadata is missing from MongoDB; integrity cannot be verified</span>;
+}
+
 function PageTitle({ title, subtitle }) {
   return <div className="page-title"><h1>{title}</h1><p>{subtitle}</p></div>;
 }
@@ -589,6 +666,29 @@ function Metric({ tone, label, value, icon, action }) {
 
 function EmptyState({ text, danger }) {
   return <div className={`notice ${danger ? "danger-text" : ""}`}>{danger ? <CircleAlert size={16} /> : <ShieldCheck size={16} />} {text}</div>;
+}
+
+function extractCreatedPollId(receipt, fallbackPollId) {
+  try {
+    const logs = parseEventLogs({
+      abi: votingAbi,
+      eventName: "PollCreated",
+      logs: receipt?.logs || []
+    });
+
+    const pollId = logs[0]?.args?.pollId;
+    if (pollId !== undefined) {
+      return Number(pollId);
+    }
+  } catch (_error) {
+    // Fallback below covers receipts that cannot be decoded by viem.
+  }
+
+  if (Number.isInteger(fallbackPollId) && fallbackPollId >= 0) {
+    return fallbackPollId;
+  }
+
+  throw new Error("Could not read pollId from PollCreated event");
 }
 
 function formatDeadline(deadline) {

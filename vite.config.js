@@ -18,7 +18,7 @@ export default {
     watch: {
       usePolling: true,
       interval: 500,
-      ignored: ["**/.env", "**/broadcast/**", "**/cache/**", "**/out/**", "**/lib/**"]
+      ignored: ["**/.env", "**/broadcast/**", "**/cache/**", "**/out/**", "**/lib/**", "**/server/node_modules/**"]
     }
   }
 };

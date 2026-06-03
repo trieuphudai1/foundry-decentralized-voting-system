@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useAccount,
   useChainId,
@@ -8,7 +9,10 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract
 } from "wagmi";
-import { isAddress, keccak256, stringToHex } from "viem";
+import { isAddress } from "viem";
+import { listPollMetadata } from "../services/pollApi";
+import { hashPollContent } from "../utils/hashPollContent";
+import { verifyPollIntegrity } from "../utils/verifyPollIntegrity";
 import { sepolia } from "./config";
 import { votingContract } from "./votingContract";
 
@@ -27,6 +31,16 @@ export function useNetworkGuard() {
 }
 
 export function usePolls() {
+  const {
+    data: metadata = [],
+    isLoading: isMetadataLoading,
+    error: metadataError,
+    refetch: refetchMetadata
+  } = useQuery({
+    queryKey: ["pollMetadata"],
+    queryFn: listPollMetadata
+  });
+
   const { data: count, isLoading: isCountLoading, error: countError, refetch: refetchCount } = useReadContract({
     ...votingContract,
     functionName: "getPollCount"
@@ -54,31 +68,41 @@ export function usePolls() {
 
   const polls = useMemo(() => {
     if (!data) return [];
+    const metadataByPollId = new Map(metadata.map((item) => [String(item.pollId), item]));
     return ids.map((id, index) => {
       const pollResult = data[index * 2]?.result;
       const optionCount = data[index * 2 + 1]?.result ?? 0n;
       if (!pollResult) return null;
       const [pollId, contentHash, deadline, isActive] = pollResult;
+      const offChain = metadataByPollId.get(pollId.toString());
+      const onChainPoll = { id: pollId, contentHash, deadline, isActive, optionCount };
+      const integrity = verifyPollIntegrity(offChain, onChainPoll);
       return {
         id: pollId,
         contentHash,
         deadline,
         isActive,
         optionCount,
-        isExpired: BigInt(Math.floor(Date.now() / 1000)) >= deadline
+        isExpired: BigInt(Math.floor(Date.now() / 1000)) >= deadline,
+        metadata: offChain || null,
+        title: offChain?.title || `Poll #${pollId.toString()}`,
+        description: offChain?.description || "Metadata is not available from MongoDB.",
+        options: offChain?.options || [],
+        integrity
       };
     }).filter(Boolean).reverse();
-  }, [data, ids]);
+  }, [data, ids, metadata]);
 
   const refetch = async () => {
-    await Promise.all([refetchCount(), refetchPolls()]);
+    await Promise.all([refetchCount(), refetchPolls(), refetchMetadata()]);
   };
 
   return {
     polls,
     count: count || 0n,
-    isLoading: isCountLoading || arePollsLoading,
-    error: countError || pollsError,
+    hasCount: count !== undefined,
+    isLoading: isCountLoading || arePollsLoading || isMetadataLoading,
+    error: countError || pollsError || metadataError,
     refetch
   };
 }
@@ -142,9 +166,9 @@ export function useVotingWrite(onSettled) {
   useEffect(() => {
     if (receipt.isSuccess && hash && settledHash.current !== hash && onSettled) {
       settledHash.current = hash;
-      onSettled(hash);
+      onSettled(hash, receipt.data);
     }
-  }, [hash, receipt.isSuccess, onSettled]);
+  }, [hash, receipt.data, receipt.isSuccess, onSettled]);
 
   return {
     write,
@@ -163,12 +187,8 @@ export function useOwner() {
   });
 }
 
-export function buildContentHash({ title, description, options }) {
-  return keccak256(stringToHex(JSON.stringify({
-    title: title.trim(),
-    description: description.trim(),
-    options: options.map((option) => option.trim()).filter(Boolean)
-  })));
+export function buildContentHash({ title, description }) {
+  return hashPollContent({ title, description });
 }
 
 export function parseAddresses(value) {
