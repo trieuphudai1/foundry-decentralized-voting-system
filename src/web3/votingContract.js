@@ -102,6 +102,15 @@ export const votingAbi = [
       { name: "option", type: "uint256" }
     ],
     outputs: [{ name: "", type: "uint256" }]
+  },
+  {
+    type: "event",
+    name: "WhitelistBatchAdded",
+    inputs: [
+      { name: "pollId", type: "uint256", indexed: false },
+      { name: "count", type: "uint256", indexed: false }
+    ],
+    anonymous: false
   }
 ];
 

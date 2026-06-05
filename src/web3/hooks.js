@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  usePublicClient,
   useAccount,
   useChainId,
   useReadContract,
@@ -9,12 +10,12 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract
 } from "wagmi";
-import { isAddress } from "viem";
+import { decodeFunctionData, isAddress } from "viem";
 import { listPollMetadata } from "../services/pollApi";
 import { hashPollContent } from "../utils/hashPollContent";
 import { verifyPollIntegrity } from "../utils/verifyPollIntegrity";
 import { sepolia } from "./config";
-import { votingContract } from "./votingContract";
+import { VOTING_CONTRACT_ADDRESS, votingAbi, votingContract } from "./votingContract";
 
 export function useNetworkGuard() {
   const chainId = useChainId();
@@ -113,7 +114,12 @@ export function usePollDetail(poll, voter) {
     return Array.from({ length: total }, (_, index) => BigInt(index));
   }, [poll?.optionCount]);
 
-  const { data: accountState, refetch: refetchAccountState } = useReadContracts({
+  const {
+    data: accountState,
+    error: accountStateError,
+    isLoading: isAccountStateLoading,
+    refetch: refetchAccountState
+  } = useReadContracts({
     contracts: voter && poll ? [
       { ...votingContract, functionName: "isWhitelisted", args: [poll.id, voter] },
       { ...votingContract, functionName: "hasUserVoted", args: [poll.id, voter] }
@@ -143,6 +149,8 @@ export function usePollDetail(poll, voter) {
     options,
     isWhitelisted: accountState?.[0]?.result,
     hasVoted: accountState?.[1]?.result,
+    isAccountStateLoading,
+    accountStateError,
     isLoading,
     refetch
   };
@@ -184,6 +192,76 @@ export function useOwner() {
   return useReadContract({
     ...votingContract,
     functionName: "owner"
+  });
+}
+
+export function useAdminStatus() {
+  const { address, isConnected } = useAccount();
+  const ownerQuery = useOwner();
+  const owner = ownerQuery.data;
+  const isAdmin = Boolean(
+    isConnected &&
+    address &&
+    owner &&
+    address.toLowerCase() === owner.toLowerCase()
+  );
+
+  return {
+    address,
+    owner,
+    isConnected,
+    isAdmin,
+    isLoading: Boolean(isConnected && ownerQuery.isLoading),
+    error: ownerQuery.error
+  };
+}
+
+export function useWhitelistedWallets(pollId, enabled = true) {
+  const publicClient = usePublicClient();
+  const pollIdText = String(pollId ?? "").trim();
+  const parsedPollId = Number(pollId);
+  const isPollIdValid = pollIdText !== "" && Number.isInteger(parsedPollId) && parsedPollId >= 0;
+
+  return useQuery({
+    queryKey: ["whitelistedWallets", publicClient?.chain?.id, VOTING_CONTRACT_ADDRESS, parsedPollId],
+    enabled: Boolean(enabled && publicClient && isPollIdValid),
+    queryFn: async () => {
+      const logs = await publicClient.getContractEvents({
+        address: VOTING_CONTRACT_ADDRESS,
+        abi: votingAbi,
+        eventName: "WhitelistBatchAdded",
+        fromBlock: 0n,
+        toBlock: "latest"
+      });
+
+      const matchingLogs = logs.filter((log) => Number(log.args?.pollId) === parsedPollId);
+      const unique = new Map();
+
+      for (const log of matchingLogs) {
+        try {
+          const transaction = await publicClient.getTransaction({ hash: log.transactionHash });
+          const decoded = decodeFunctionData({
+            abi: votingAbi,
+            data: transaction.input
+          });
+
+          if (decoded.functionName !== "addToWhitelist") continue;
+          const [logPollId, voters] = decoded.args;
+          if (Number(logPollId) !== parsedPollId || !Array.isArray(voters)) continue;
+
+          for (const voter of voters) {
+            const key = voter.toLowerCase();
+            if (!unique.has(key)) {
+              unique.set(key, voter);
+            }
+          }
+        } catch (_error) {
+          // Ignore logs whose transaction input cannot be decoded by the current ABI.
+        }
+      }
+
+      return Array.from(unique.values());
+    }
   });
 }
 

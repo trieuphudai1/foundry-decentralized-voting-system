@@ -149,7 +149,7 @@ contract VotingTest is Test {
         assertTrue(voting.whitelist(0, makeAddr("Voter2")));
     }
 
-    function testAddToWhitelistOverwrite() public {
+    function testAddToWhitelistDuplicateRevertsWhenNoNewVoters() public {
         vm.prank(OWNER);
         voting.createPoll(keccak256("Poll"), block.timestamp + 1 days, 2);
 
@@ -161,11 +161,11 @@ contract VotingTest is Test {
         vm.prank(OWNER);
         voting.addToWhitelist(0, voters);
 
-        // add again
-        vm.prank(OWNER);
-        voting.addToWhitelist(0, voters);
-
         assertTrue(voting.whitelist(0, voter));
+
+        vm.prank(OWNER);
+        vm.expectRevert(bytes("No new voters added"));
+        voting.addToWhitelist(0, voters);
     }
 
     function testWhitelistIsolationBetweenPolls() public {

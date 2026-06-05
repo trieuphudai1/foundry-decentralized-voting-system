@@ -62,7 +62,8 @@ contract Voting is Ownable, ReentrancyGuard {
     event PollCreated(uint256 pollId, bytes32 contentHash, uint256 deadline);
     event Voted(uint256 pollId, address voter, uint256 option);
     event PollEnded(uint256 pollId, EndReason reason);
-    event WhitelistBatchAdded(uint256 pollId, uint256 count);
+    event VoterWhitelisted(uint256 indexed pollId, address indexed voter);
+    event WhitelistBatchAdded(uint256 indexed pollId, uint256 count);
 
     // Functions
     function createPoll(bytes32 _contentHash, uint256 _deadline, uint256 _optionCount) external onlyOwner {
@@ -90,12 +91,24 @@ contract Voting is Ownable, ReentrancyGuard {
 
     function addToWhitelist(uint256 _pollId, address[] calldata _voters) external onlyOwner pollExists(_pollId) {
         require(_voters.length > 0, "Empty list");
+
+        uint256 addedCount = 0;
         uint256 voterLength = _voters.length;
+
         for (uint256 i = 0; i < voterLength; i++) {
-            whitelist[_pollId][_voters[i]] = true;
+            address voter = _voters[i];
+            require(voter != address(0), "Invalid voter address");
+
+            if (!whitelist[_pollId][voter]) {
+                whitelist[_pollId][voter] = true;
+                addedCount++;
+                emit VoterWhitelisted(_pollId, voter);
+            }
         }
 
-        emit WhitelistBatchAdded(_pollId, voterLength);
+        require(addedCount > 0, "No new voters added");
+
+        emit WhitelistBatchAdded(_pollId, addedCount);
     }
 
     function vote(uint256 _pollId, uint256 _option)
