@@ -1,5 +1,5 @@
 export const VOTING_CONTRACT_ADDRESS =
-  import.meta.env.VITE_CONTRACT_ADDRESS || "0xC9154bfC663f2e3B212EA79A90e6c73c1Cec0Af9";
+  import.meta.env.VITE_CONTRACT_ADDRESS || "0x6470dc9aC08D8C1613B9310593AdF798B75eD146";
 
 export const votingAbi = [
   {
@@ -107,8 +107,17 @@ export const votingAbi = [
     type: "event",
     name: "WhitelistBatchAdded",
     inputs: [
-      { name: "pollId", type: "uint256", indexed: false },
+      { name: "pollId", type: "uint256", indexed: true },
       { name: "count", type: "uint256", indexed: false }
+    ],
+    anonymous: false
+  },
+  {
+    type: "event",
+    name: "VoterWhitelisted",
+    inputs: [
+      { name: "pollId", type: "uint256", indexed: true },
+      { name: "voter", type: "address", indexed: true }
     ],
     anonymous: false
   }

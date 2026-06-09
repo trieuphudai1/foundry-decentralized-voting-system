@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract
 } from "wagmi";
-import { decodeFunctionData, isAddress } from "viem";
+import { isAddress } from "viem";
 import { listPollMetadata } from "../services/pollApi";
 import { hashPollContent } from "../utils/hashPollContent";
 import { verifyPollIntegrity } from "../utils/verifyPollIntegrity";
@@ -221,48 +221,100 @@ export function useWhitelistedWallets(pollId, enabled = true) {
   const pollIdText = String(pollId ?? "").trim();
   const parsedPollId = Number(pollId);
   const isPollIdValid = pollIdText !== "" && Number.isInteger(parsedPollId) && parsedPollId >= 0;
+  const deploymentBlock = getDeploymentFromBlock();
+  const logBlockRange = getLogBlockRange();
 
   return useQuery({
-    queryKey: ["whitelistedWallets", publicClient?.chain?.id, VOTING_CONTRACT_ADDRESS, parsedPollId],
+    queryKey: [
+      "whitelistedWallets",
+      publicClient?.chain?.id,
+      VOTING_CONTRACT_ADDRESS,
+      parsedPollId,
+      deploymentBlock?.toString() || "recent",
+      logBlockRange.toString()
+    ],
     enabled: Boolean(enabled && publicClient && isPollIdValid),
     queryFn: async () => {
-      const logs = await publicClient.getContractEvents({
-        address: VOTING_CONTRACT_ADDRESS,
-        abi: votingAbi,
-        eventName: "WhitelistBatchAdded",
-        fromBlock: 0n,
-        toBlock: "latest"
-      });
-
-      const matchingLogs = logs.filter((log) => Number(log.args?.pollId) === parsedPollId);
+      const latestBlock = await publicClient.getBlockNumber();
+      const fromBlock = deploymentBlock ?? getFallbackFromBlock(latestBlock);
+      const logs = await getVoterWhitelistedLogs(publicClient, fromBlock, latestBlock, logBlockRange);
+      const matchingLogs = logs.filter((log) => BigInt(log.args?.pollId ?? -1) === BigInt(parsedPollId));
       const unique = new Map();
 
       for (const log of matchingLogs) {
-        try {
-          const transaction = await publicClient.getTransaction({ hash: log.transactionHash });
-          const decoded = decodeFunctionData({
-            abi: votingAbi,
-            data: transaction.input
-          });
-
-          if (decoded.functionName !== "addToWhitelist") continue;
-          const [logPollId, voters] = decoded.args;
-          if (Number(logPollId) !== parsedPollId || !Array.isArray(voters)) continue;
-
-          for (const voter of voters) {
-            const key = voter.toLowerCase();
-            if (!unique.has(key)) {
-              unique.set(key, voter);
-            }
-          }
-        } catch (_error) {
-          // Ignore logs whose transaction input cannot be decoded by the current ABI.
+        const voter = log.args?.voter;
+        if (!voter) continue;
+        const key = voter.toLowerCase();
+        if (!unique.has(key)) {
+          unique.set(key, voter);
         }
       }
 
       return Array.from(unique.values());
     }
   });
+}
+
+function getDeploymentFromBlock() {
+  const value = import.meta.env.VITE_DEPLOYMENT_BLOCK;
+  if (!value) return null;
+
+  try {
+    const block = BigInt(value);
+    return block > 0n ? block : null;
+  } catch (_error) {
+    console.warn("Invalid VITE_DEPLOYMENT_BLOCK. Falling back to a recent block range for VoterWhitelisted logs.");
+    return null;
+  }
+}
+
+function getLogBlockRange() {
+  const value = import.meta.env.VITE_LOG_BLOCK_RANGE;
+  if (!value) return 10n;
+
+  try {
+    const range = BigInt(value);
+    return range > 0n ? range : 10n;
+  } catch (_error) {
+    console.warn("Invalid VITE_LOG_BLOCK_RANGE. Falling back to 10 blocks per VoterWhitelisted getLogs request.");
+    return 10n;
+  }
+}
+
+function getFallbackFromBlock(latestBlock) {
+  const fallbackWindow = 100000n;
+  console.warn("VITE_DEPLOYMENT_BLOCK is not set. Reading VoterWhitelisted logs from a recent block range only.");
+  if (latestBlock <= fallbackWindow) return 1n;
+  return latestBlock - fallbackWindow;
+}
+
+async function getVoterWhitelistedLogs(publicClient, fromBlock, latestBlock, chunkSize) {
+  const logs = [];
+
+  for (let current = fromBlock; current <= latestBlock;) {
+    const toBlock = current + chunkSize - 1n > latestBlock ? latestBlock : current + chunkSize - 1n;
+    try {
+      const chunk = await publicClient.getContractEvents({
+        address: VOTING_CONTRACT_ADDRESS,
+        abi: votingAbi,
+        eventName: "VoterWhitelisted",
+        fromBlock: current,
+        toBlock
+      });
+      logs.push(...chunk);
+    } catch (error) {
+      console.error("Failed to read VoterWhitelisted logs", {
+        error,
+        fromBlock: current.toString(),
+        toBlock: toBlock.toString(),
+        chunkSize: chunkSize.toString()
+      });
+      throw error;
+    }
+    current = toBlock + 1n;
+  }
+
+  return logs;
 }
 
 export function buildContentHash({ title, description }) {

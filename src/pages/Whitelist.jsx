@@ -133,7 +133,7 @@ export default function Whitelist({ polls, setTx, refetchPolls }) {
               <h3>Whitelisted Wallets</h3>
               <span>{whitelisted.data?.length || 0}</span>
             </div>
-            <p className="whitelist-note">Whitelist entries are reconstructed from on-chain events. Already added wallets cannot be removed from this UI.</p>
+            <p className="whitelist-note">Whitelist entries are read from on-chain VoterWhitelisted events. Already added wallets cannot be removed from this UI.</p>
             <WhitelistedWalletsList
               copiedAddress={copiedAddress}
               isPollIdValid={isPollIdValid}
@@ -177,7 +177,7 @@ function WhitelistedWalletsList({ copiedAddress, isPollIdValid, onCopy, query })
   }
 
   if (query.error) {
-    return <div className="whitelist-wallet-empty danger-text">Could not read whitelist events from the RPC.</div>;
+    return <div className="whitelist-wallet-empty danger-text">RPC getLogs failed. Current RPC allows only small block ranges. Try setting VITE_LOG_BLOCK_RANGE=10 or use a better Sepolia RPC.</div>;
   }
 
   const wallets = query.data || [];
