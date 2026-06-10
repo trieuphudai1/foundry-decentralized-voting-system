@@ -127,20 +127,6 @@ export default function Whitelist({ polls, setTx, refetchPolls }) {
 
             <button className="primary whitelist-submit-btn" onClick={submit} disabled={!canSubmit}><Plus size={16} /> {writer.isBusy ? "Processing..." : "Add to Whitelist"}</button>
           </div>
-
-          <section className="whitelisted-wallets-card">
-            <div className="known-polls-head">
-              <h3>Whitelisted Wallets</h3>
-              <span>{whitelisted.data?.length || 0}</span>
-            </div>
-            <p className="whitelist-note">Whitelist entries are read from on-chain VoterWhitelisted events. Already added wallets cannot be removed from this UI.</p>
-            <WhitelistedWalletsList
-              copiedAddress={copiedAddress}
-              isPollIdValid={isPollIdValid}
-              onCopy={copyAddress}
-              query={whitelisted}
-            />
-          </section>
         </div>
 
         <aside className="known-polls-card">

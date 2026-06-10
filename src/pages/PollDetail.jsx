@@ -1,9 +1,10 @@
 import { useCallback, useState } from "react";
-import { BadgeCheck, CircleAlert, Clock3, Copy, Fingerprint, Link2, LockKeyhole, UserRound, UsersRound, Vote } from "lucide-react";
+import { BadgeCheck, CircleAlert, Clock3, Fingerprint, Link2, LockKeyhole, UserRound, UsersRound, Vote } from "lucide-react";
 import { useAccount } from "wagmi";
 import { getFriendlyError, useNetworkGuard, usePollDetail, useVotingWrite } from "../web3/hooks";
 import {
   BackButton,
+  CopyHashButton,
   Detail,
   EmptyPage,
   IntegrityNotice,
@@ -69,7 +70,7 @@ export default function PollDetail({ poll, setRoute, setTx, refetchPolls }) {
           <Detail icon={<UsersRound />} label="Total votes" value={totalVotes.toString()} />
           <Detail icon={<Vote />} label="Your status" value={detail.hasVoted ? "Voted" : "Not voted"} danger={!detail.hasVoted} />
           <Detail icon={<LockKeyhole />} label="Whitelist" value={getWhitelistDetailValue({ detail, isConnected, isSepolia })} danger={detail.isWhitelisted === false} />
-          <Detail icon={<Link2 />} label="Content hash" value={shortHash(poll.contentHash)} copy={<Copy size={14} />} />
+          <Detail icon={<Link2 />} label="Content hash" value={shortHash(poll.contentHash)} copy={<CopyHashButton value={poll.contentHash} />} />
         </dl>
         <WhitelistStatus detail={detail} isConnected={isConnected} isSepolia={isSepolia} />
         <IntegrityNotice integrity={poll.integrity} />

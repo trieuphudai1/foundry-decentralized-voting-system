@@ -1,5 +1,5 @@
 export const VOTING_CONTRACT_ADDRESS =
-  import.meta.env.VITE_CONTRACT_ADDRESS || "0x6470dc9aC08D8C1613B9310593AdF798B75eD146";
+  import.meta.env.VITE_CONTRACT_ADDRESS || "0x4FDEC8844431DdB2b2bA463AFa032D99D7ADbfa9";
 
 export const votingAbi = [
   {

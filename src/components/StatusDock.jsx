@@ -1,5 +1,5 @@
 import { Check, CircleX, Clock3, ExternalLink, Gauge, X } from "lucide-react";
-import { sepolia } from "../web3/config";
+import { getSepoliaTxUrl } from "./SharedUI";
 
 export default function StatusDock({ tx, onClose, onRetry }) {
   const states = {
@@ -10,6 +10,7 @@ export default function StatusDock({ tx, onClose, onRetry }) {
     error: { icon: <CircleX />, tone: "failed" }
   };
   const current = states[tx.status] || states.idle;
+  const txUrl = getSepoliaTxUrl(tx.hash);
   return (
     <aside className="status-dock" aria-label="Transaction status">
       <div className="dock-tabs">
@@ -21,7 +22,7 @@ export default function StatusDock({ tx, onClose, onRetry }) {
         <h3>{tx.title}</h3>
         <p>{tx.text}</p>
         {tx.retryMetadata && <button className="primary" onClick={onRetry}>Retry Save</button>}
-        {tx.hash && <a className="secondary" href={`${sepolia.blockExplorers.default.url}/tx/${tx.hash}`} target="_blank" rel="noreferrer">View on Etherscan <ExternalLink size={14} /></a>}
+        {txUrl && <a className="secondary" href={txUrl} target="_blank" rel="noreferrer">View on Etherscan <ExternalLink size={14} /></a>}
       </div>
     </aside>
   );

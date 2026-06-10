@@ -8,11 +8,12 @@ import { VOTING_CONTRACT_ADDRESS } from "../web3/votingContract";
 
 export default function PollsList({ pollsState, onSelect }) {
   const [filter, setFilter] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalizedQuery = searchTerm.trim().toLowerCase();
   const visiblePolls = pollsState.polls.filter((poll) => {
     const active = poll.isActive && !poll.isExpired;
-    if (filter === "Active") return active;
-    if (filter === "Closed") return !active;
-    return true;
+    const matchesStatus = filter === "All" || (filter === "Active" ? active : !active);
+    return matchesStatus && matchesSearch(poll, normalizedQuery);
   });
 
   return (
@@ -22,7 +23,11 @@ export default function PollsList({ pollsState, onSelect }) {
       <div className="list-toolbar">
         <label className="search-box">
           <Search size={16} />
-          <input placeholder="Search by poll id or hash..." readOnly />
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search by poll id or hash..."
+          />
         </label>
         <div className="segmented">
           {["All", "Active", "Closed"].map((item) => (
@@ -32,7 +37,7 @@ export default function PollsList({ pollsState, onSelect }) {
       </div>
       {pollsState.isLoading && <EmptyState text="Loading polls from contract..." />}
       {pollsState.error && <EmptyState text={getFriendlyError(pollsState.error)} danger />}
-      {!pollsState.isLoading && !visiblePolls.length && <EmptyState text="No polls found on this contract yet." />}
+      {!pollsState.isLoading && !visiblePolls.length && <EmptyState text="No polls found." />}
       <div className="poll-grid">
         {visiblePolls.map((poll) => (
           <article className="poll-card" key={poll.id.toString()}>
@@ -55,4 +60,40 @@ export default function PollsList({ pollsState, onSelect }) {
       </div>
     </section>
   );
+}
+
+function matchesSearch(poll, query) {
+  if (!query) return true;
+
+  const pollId = String(poll.id ?? poll.pollId ?? "");
+  const hashes = [
+    poll.contentHash,
+    poll.metadataHash,
+    poll.hash,
+    poll.transactionHash,
+    poll.txHash,
+    poll.metadata?.contentHash,
+    poll.metadata?.metadataHash,
+    poll.metadata?.hash,
+    poll.metadata?.transactionHash,
+    poll.metadata?.txHash
+  ].filter(Boolean).map(String);
+
+  const searchableText = [
+    pollId,
+    `#${pollId}`,
+    `poll ${pollId}`,
+    `poll #${pollId}`,
+    poll.title,
+    poll.description,
+    poll.metadata?.title,
+    poll.metadata?.description,
+    ...hashes,
+    ...hashes.map(shortHash)
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(query);
 }

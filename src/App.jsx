@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAccount } from "wagmi";
 import Header, { WalletButton } from "./components/Header";
 import EmptyState from "./components/EmptyState";
 import { PageTitle } from "./components/SharedUI";
@@ -23,8 +24,40 @@ export default function App() {
   const [route, setRoute] = useState("home");
   const [selectedPollId, setSelectedPollId] = useState(null);
   const [tx, setTx] = useState(idleTx);
+  const { address, isConnected } = useAccount();
+  const accountRef = useRef({ address: undefined, isConnected: false });
+  const previousAddressRef = useRef(null);
   const pollsState = usePolls();
   const adminStatus = useAdminStatus();
+
+  accountRef.current = { address, isConnected };
+
+  const resetStatusDock = useCallback(() => {
+    setTx(idleTx);
+  }, []);
+
+  const setTransactionStatus = useCallback((nextTx) => {
+    const account = accountRef.current;
+    if (!account.isConnected || !account.address) {
+      setTx(idleTx);
+      return;
+    }
+    setTx(nextTx);
+  }, []);
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      previousAddressRef.current = null;
+      resetStatusDock();
+      return;
+    }
+
+    const normalizedAddress = address.toLowerCase();
+    if (previousAddressRef.current && previousAddressRef.current !== normalizedAddress) {
+      resetStatusDock();
+    }
+    previousAddressRef.current = normalizedAddress;
+  }, [address, isConnected, resetStatusDock]);
 
   const activeRoute = useMemo(() => {
     if (route === "home") return "home";
@@ -43,13 +76,13 @@ export default function App() {
   const retrySaveMetadata = async () => {
     if (!tx.retryMetadata) return;
     try {
-      setTx({ ...tx, status: "pending", title: "Retrying metadata save", text: "Saving poll metadata to MongoDB." });
+      setTransactionStatus({ ...tx, status: "pending", title: "Retrying metadata save", text: "Saving poll metadata to MongoDB." });
       await savePollMetadata(tx.retryMetadata);
       await pollsState.refetch();
-      setTx({ status: "success", title: "Metadata saved", text: `Poll #${tx.retryMetadata.pollId} metadata is now stored in MongoDB.`, hash: tx.hash });
+      setTransactionStatus({ status: "success", title: "Metadata saved", text: `Poll #${tx.retryMetadata.pollId} metadata is now stored in MongoDB.`, hash: tx.hash });
       setRoute("polls");
     } catch (error) {
-      setTx({ ...tx, status: "error", title: "Metadata save failed", text: getFriendlyError(error) || error.message });
+      setTransactionStatus({ ...tx, status: "error", title: "Metadata save failed", text: getFriendlyError(error) || error.message });
     }
   };
 
@@ -61,25 +94,25 @@ export default function App() {
       <main>
         {route === "home" && <Landing setRoute={setRoute} />}
         {route === "polls" && <PollsList pollsState={pollsState} onSelect={selectPoll} />}
-        {route === "detail" && <PollDetail poll={selectedPoll} setRoute={setRoute} setTx={setTx} refetchPolls={pollsState.refetch} />}
+        {route === "detail" && <PollDetail poll={selectedPoll} setRoute={setRoute} setTx={setTransactionStatus} refetchPolls={pollsState.refetch} />}
         {route === "results" && <Results poll={selectedPoll} setRoute={setRoute} />}
         {route === "dashboard" && (
           <AdminRoute adminStatus={adminStatus} setRoute={setRoute}>
-            <AdminDashboard adminStatus={adminStatus} pollsState={pollsState} setRoute={setRoute} setTx={setTx} />
+            <AdminDashboard adminStatus={adminStatus} pollsState={pollsState} setRoute={setRoute} setTx={setTransactionStatus} />
           </AdminRoute>
         )}
         {route === "create" && (
           <AdminRoute adminStatus={adminStatus} setRoute={setRoute}>
-            <CreatePoll hasPollCount={pollsState.hasCount} isAdmin={adminStatus.isAdmin} pollCount={pollsState.count} setRoute={setRoute} setTx={setTx} refetchPolls={pollsState.refetch} />
+            <CreatePoll hasPollCount={pollsState.hasCount} isAdmin={adminStatus.isAdmin} pollCount={pollsState.count} setRoute={setRoute} setTx={setTransactionStatus} refetchPolls={pollsState.refetch} />
           </AdminRoute>
         )}
         {route === "whitelist" && (
           <AdminRoute adminStatus={adminStatus} setRoute={setRoute}>
-            <Whitelist polls={pollsState.polls} setTx={setTx} refetchPolls={pollsState.refetch} />
+            <Whitelist polls={pollsState.polls} setTx={setTransactionStatus} refetchPolls={pollsState.refetch} />
           </AdminRoute>
         )}
       </main>
-      <StatusDock tx={tx} onClose={() => setTx(idleTx)} onRetry={retrySaveMetadata} />
+      <StatusDock tx={tx} onClose={resetStatusDock} onRetry={retrySaveMetadata} />
     </div>
   );
 }

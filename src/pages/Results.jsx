@@ -7,6 +7,7 @@ import {
   StatusTag,
   Summary,
   formatDeadline,
+  getSepoliaAddressUrl,
   shortAddress
 } from "../components/SharedUI";
 import { VOTING_CONTRACT_ADDRESS } from "../web3/votingContract";
@@ -27,7 +28,7 @@ export default function Results({ poll, setRoute }) {
         <Summary icon={<Vote />} label="Total Votes" value={total.toString()} />
         <Summary icon={<UsersRound />} label="Options" value={poll.optionCount.toString()} />
         <Summary icon={<CalendarClock />} label="Deadline" value={formatDeadline(poll.deadline)} />
-        <Summary icon={<BadgeCheck />} label="Contract" value={shortAddress(VOTING_CONTRACT_ADDRESS)} action />
+        <Summary icon={<BadgeCheck />} label="Contract" value={shortAddress(VOTING_CONTRACT_ADDRESS)} actionUrl={getSepoliaAddressUrl(VOTING_CONTRACT_ADDRESS)} />
       </div>
       <div className="bars">
         {detail.options.map((option) => {

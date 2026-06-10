@@ -1,8 +1,12 @@
+import { useState } from "react";
 import {
   BadgeCheck,
   ChevronLeft,
   CircleAlert,
+  Check,
+  Copy,
   DatabaseZap,
+  ExternalLink,
   Fingerprint,
   LayoutDashboard,
   FilePlus2,
@@ -61,8 +65,21 @@ export function Detail({ icon, label, value, danger, copy }) {
   );
 }
 
-export function Summary({ icon, label, value, action }) {
-  return <div className="summary-item">{icon}<span><small>{label}</small><strong>{value}</strong>{action && <em>View on Etherscan</em>}</span></div>;
+export function Summary({ icon, label, value, actionUrl }) {
+  return (
+    <div className="summary-item">
+      {icon}
+      <span>
+        <small>{label}</small>
+        <strong>{value}</strong>
+        {actionUrl && (
+          <a className="summary-link" href={actionUrl} target="_blank" rel="noreferrer">
+            View on Etherscan <ExternalLink size={12} />
+          </a>
+        )}
+      </span>
+    </div>
+  );
 }
 
 export function Metric({ tone, label, value, icon, action }) {
@@ -104,5 +121,69 @@ export function shortAddress(address) {
 }
 
 export function shortHash(hash) {
+  if (!hash) return "";
   return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+}
+
+export function getSepoliaAddressUrl(address) {
+  if (!address) return "";
+  return `https://sepolia.etherscan.io/address/${address}`;
+}
+
+export function getSepoliaTxUrl(txHash) {
+  if (!txHash) return "";
+  return `https://sepolia.etherscan.io/tx/${txHash}`;
+}
+
+export async function copyToClipboard(value) {
+  if (!value) return false;
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (error) {
+    console.error("Failed to copy to clipboard:", error);
+    return false;
+  }
+}
+
+export function CopyHashButton({ value }) {
+  const [copyState, setCopyState] = useState("idle");
+  const disabled = !value;
+
+  const handleCopy = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (disabled) return;
+
+    const copied = await copyToClipboard(value);
+    setCopyState(copied ? "copied" : "error");
+    window.setTimeout(() => setCopyState("idle"), 1500);
+  };
+
+  return (
+    <button
+      className="copy-inline-btn"
+      type="button"
+      onClick={handleCopy}
+      disabled={disabled}
+      aria-label={copyState === "copied" ? "Copied content hash" : "Copy full content hash"}
+      title={copyState === "error" ? "Copy failed" : copyState === "copied" ? "Copied" : "Copy full content hash"}
+    >
+      {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  );
 }
